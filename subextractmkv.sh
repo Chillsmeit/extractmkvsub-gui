@@ -76,6 +76,8 @@ elif [[ $chosen_codec_id == "S_HDMV/PGS" ]]; then
     SUPSUB_response=$?
     if [[ $SUPSUB_response -eq 0 ]]; then # User chose "Yes"
         ffmpeg -i "$mkv_file" -map 0:s:"${chosen_subtitle_id}"? "$mkv_file_noext.srt"
+    else
+        mkvextract tracks "$mkv_file" "${chosen_subtitle_id}":"$mkv_file_noext.sup"
     fi
 elif [[ $chosen_codec_id == "S_VOBSUB" ]]; then
     mkvextract tracks "$mkv_file" "${chosen_subtitle_id}":"$mkv_file_noext"
