@@ -64,7 +64,7 @@ for ((i=0; i<${#id_array[@]}; i++)); do
 	fi
 done
 
-# Extract the subtitle based on the chosen codec ID
+# Extract the subtitle based on the chosen codec
 if [[ $index -ne -1 ]]; then
 	chosen_codec="${codec_array[index]}"
 fi
