@@ -22,4 +22,3 @@ Run the script **without** sudo privileges:
 ```
 ./extractmkvsub-gui.sh
 ```
-a03a-446f-4ad4-b215-22d
