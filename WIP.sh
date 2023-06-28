@@ -1,0 +1,270 @@
+#!/bin/bash
+
+# Install required packages if not installed
+if ! command -v zenity &> /dev/null; then
+	echo "Zenity is not installed. Installing Zenity..."
+	sudo apt-get install -y zenity
+fi
+
+if ! command -v mkvmerge &> /dev/null; then
+	echo "MKVToolNix is not installed. Installing MKVToolNix..."
+	sudo apt-get install -y mkvtoolnix
+fi
+
+if ! command -v jq &> /dev/null; then
+	echo "jq is not installed. Installing jq..."
+	sudo apt-get install -y jq
+fi
+
+# Prompt user to choose an MKV file
+mkv_file=$(zenity --file-selection --title="Choose an MKV file" --file-filter="MKV files (*.mkv) | *.mkv" --file-filter="All files | *")
+
+# Chosen MKV file without extension
+mkv_file_noext="${mkv_file%.*}"
+
+
+# Function for the audio extraction sub-menu
+function run_audio() {
+	# Get audio tracks information with JSON for IDs
+	audio_id=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "audio") | .id')
+
+	# Check if there are audio tracks
+	if [[ -z $audio_id ]]; then
+		zenity --error --text="No audio tracks found in the selected MKV file."
+		exit 1
+	fi
+
+	# Get audio tracks information with JSON for language, trackname, codec and extension type
+	audio_language=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "audio") | .properties.language')
+	audio_trackname=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "audio") | .properties.track_name')
+	audio_codec=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "audio") | .codec')
+
+	# Store corresponding extension type for each codec in audio_codec
+	audio_extension=""
+	while IFS= read -r line; do
+	  case "$line" in
+	    "AAC")
+	      audio_extension+=".aac"
+	      ;;
+	    "Opus")
+	      audio_extension+=".opus"
+	      ;;
+	    "Vorbis")
+	      audio_extension+=".ogg"
+	      ;;
+	  esac
+	  audio_extension+=$'\n'  # Add a newline character after each iteration
+	done <<< "$audio_codec"
+
+	# Prompt user to choose an audio track
+	mapfile -t id_array <<< "$audio_id"
+	mapfile -t language_array <<< "$audio_language"
+	mapfile -t codec_array <<< "$audio_codec"
+	mapfile -t extension_array <<< "$audio_extension"
+	mapfile -t trackname_array <<< "$audio_trackname"
+
+	# Create an array of options for the Zenity list dialog
+	options=()
+	for ((i=0; i<${#id_array[@]}; i++)); do
+		options+=("${id_array[i]}" "${language_array[i]}" "${codec_array[i]}" "${extension_array[i]}" "${trackname_array[i]}")
+	done
+
+	# Show the selected array values with Zenity list dialog
+	chosen_audio_id=$(zenity --list --title="Choose an audio track" --column="ID" --column="Language" --column="Codec" --column="Extension Type" --column="Track Name" --height=400 --width=700 "${options[@]}")
+
+	# Cancel program if user clicks "Cancel"
+	if [[ $? -eq 1 ]]; then
+		exit 1
+	fi
+
+	# Check if user selected an audio ID
+	if [[ -z $chosen_audio_id ]]; then
+		zenity --error --text="No audio ID selected."
+		exit 1
+	fi
+
+	# Find the index of the chosen_audio_id in the id_array
+	index=-1
+	for ((i=0; i<${#id_array[@]}; i++)); do
+		if [[ "${id_array[i]}" == "$chosen_audio_id" ]]; then
+			index=$i
+			break
+		fi
+	done
+
+	if [[ $index -ne -1 ]]; then
+		chosen_codec="${codec_array[index]}"
+	fi
+
+	# Extract the audio track based on the chosen codec ID
+	if [[ $chosen_codec == "AAC" ]]; then
+		mkvextract tracks "$mkv_file" "${chosen_audio_id}":"$mkv_file_noext.aac"
+	elif [[ $chosen_codec == "Opus" ]]; then
+		mkvextract tracks "$mkv_file" "${chosen_audio_id}":"$mkv_file_noext.opus"
+	elif [[ $chosen_codec == "Vorbis" ]]; then
+		mkvextract tracks "$mkv_file" "${chosen_audio_id}":"$mkv_file_noext.ogg"
+	fi
+
+	# Show success message
+	zenity --info --text="Audio ID $chosen_audio_id extracted successfully"
+}
+
+# Function for the subtitle extraction sub-menu
+function run_subtitle() {
+	# Get subtitle tracks information with JSON for IDs
+	subtitle_id=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "subtitles") | .id')
+
+	# Check if there are subtitle tracks
+	if [[ -z $subtitle_id ]]; then
+		zenity --error --text="No subtitle tracks found in the selected MKV file."
+		exit 1
+	fi
+
+	# Get subtitle tracks information with JSON for language, trackname, codec and extension type
+	subtitle_language=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "subtitles") | .properties.language')
+	subtitle_trackname=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "subtitles") | .properties.track_name')
+	subtitle_codec=$(mkvmerge -J "$mkv_file" | jq -r '.tracks[] | select(.type == "subtitles") | .codec')
+
+	# Store corresponding extension type for each codec in subtitle_codec
+	subtitle_extension=""
+	while IFS= read -r line; do
+	  case "$line" in
+	    "SubStationAlpha")
+	      subtitle_extension+=".ass"
+	      ;;
+	    "HDMV PGS")
+	      subtitle_extension+=".sup"
+	      ;;
+	    "SubRip/SRT")
+	      subtitle_extension+=".srt"
+	      ;;
+	    "VobSub")
+	      subtitle_extension+=".idx & .sub"
+	      ;;
+	  esac
+	  subtitle_extension+=$'\n'  # Add a newline character after each iteration
+	done <<< "$subtitle_codec"
+
+	# Prompt user to choose a subtitle track
+	mapfile -t id_array <<< "$subtitle_id"
+	mapfile -t language_array <<< "$subtitle_language"
+	mapfile -t codec_array <<< "$subtitle_codec"
+	mapfile -t extension_array <<< "$subtitle_extension"
+	mapfile -t trackname_array <<< "$subtitle_trackname"
+
+	# Create an array of options for the Zenity list dialog
+	options=()
+	for ((i=0; i<${#id_array[@]}; i++)); do
+		options+=("${id_array[i]}" "${language_array[i]}" "${codec_array[i]}" "${extension_array[i]}" "${trackname_array[i]}")
+	done
+
+	# Show the selected array values with Zenity list dialog
+	chosen_subtitle_id=$(zenity --list --title="Choose a subtitle" --column="ID" --column="Language" --column="Codec" --column="Extension Type" --column="Track Name" --height=400 --width=700 "${options[@]}")
+
+	# Cancel program if user clicks "Cancel"
+	if [[ $? -eq 1 ]]; then
+		exit 1
+	fi
+
+	# Check if user selected a subtitle ID
+	if [[ -z $chosen_subtitle_id ]]; then
+		zenity --error --text="No subtitle ID selected."
+		exit 1
+	fi
+
+	# Find the index of the chosen_subtitle_id in the id_array
+	index=-1
+	for ((i=0; i<${#id_array[@]}; i++)); do
+		if [[ "${id_array[i]}" == "$chosen_subtitle_id" ]]; then
+			index=$i
+			break
+		fi
+	done
+
+	if [[ $index -ne -1 ]]; then
+		chosen_codec="${codec_array[index]}"
+	fi
+
+	# Extract the subtitle based on the chosen codec ID
+	if [[ $chosen_codec == "SubStationAlpha" ]]; then
+		mkvextract tracks "$mkv_file" "${chosen_subtitle_id}":"$mkv_file_noext.ass"
+	elif [[ $chosen_codec == "HDVM PGS" ]]; then
+		mkvextract tracks "$mkv_file" "${chosen_subtitle_id}":"$mkv_file_noext.sup"
+	elif [[ $chosen_codec == "SubRip/SRT" ]]; then
+		mkvextract tracks "$mkv_file" "${chosen_subtitle_id}":"$mkv_file_noext.srt"
+	elif [[ $chosen_codec == "VobSub" ]]; then
+		mkvextract tracks "$mkv_file" "${chosen_subtitle_id}":"$mkv_file_noext"
+	fi
+
+	# Show success message
+	zenity --info --text="Subtitle ID $chosen_subtitle_id extracted successfully"
+}
+
+# Function for the attachment extraction sub-menu
+function run_attachments() {
+	# Get attachment tracks information with JSON for IDs
+	attachment_id=$(mkvmerge -J "$mkv_file" | jq -r '.attachments[] | .id')
+
+	# Check if there are attachments
+	if [[ -z $attachment_id ]]; then
+		zenity --error --text="No attachment tracks found in the selected MKV file."
+		exit 1
+	fi
+
+	# Get attachment tracks information with JSON for content type and file_name
+	attachment_type=$(mkvmerge -J "$mkv_file" | jq -r '.attachments[] | .content_type')
+	attachment_name=$(mkvmerge -J "$mkv_file" | jq -r '.attachments[] | .file_name')
+
+	# Prompt user to choose an attachment track
+	mapfile -t id_array <<< "$attachment_id"
+	mapfile -t type_array <<< "$attachment_type"
+	mapfile -t name_array <<< "$attachment_name"
+
+	# Create an array of options for the Zenity list dialog
+	options=()
+	for ((i=0; i<${#id_array[@]}; i++)); do
+		options+=("False" "${id_array[i]}" "${type_array[i]}" "${name_array[i]}")
+	done
+
+	# Show the selected array values with Zenity list dialog
+	chosen_attachment_ids=$(zenity --list --checklist --title="Choose an attachment" --column="Option" --column="ID" --column="Type" --column="Name" --height=400 --width=700 "${options[@]}" --separator=",")
+
+	# Cancel program if user clicks "Cancel" or doesn't select any attachments
+	if [[ $? -eq 1 || -z $chosen_attachment_ids ]]; then
+		exit 1
+	fi
+
+	# Extract attachments for each chosen ID
+	IFS=',' read -ra chosen_attachment_ids_array <<< "$chosen_attachment_ids"
+	for chosen_attachment_id in "${chosen_attachment_ids_array[@]}"; do
+		index=-1
+		for ((i=0; i<${#id_array[@]}; i++)); do
+			if [[ "${id_array[i]}" == "$chosen_attachment_id" ]]; then
+				index=$i
+				break
+			fi
+		done
+
+		if [[ $index -ne -1 ]]; then
+			chosen_name="${name_array[index]}"
+			mkvextract attachments "$mkv_file" "${chosen_attachment_id}":"$chosen_name"
+			# Show success message for each extracted attachment
+			zenity --info --text="$chosen_name extracted successfully"
+		fi
+	done
+}
+
+
+
+# Show main menu
+mainmenu_output=$(zenity --forms --title "ExtractMKV" --text "" --add-combo "Extract:" --combo-values "Video|Audio|Subtitles|Attachements|Chapters|All")
+mainmenu_option=$(echo "$mainmenu_output" | awk -F'|' '{print $1}')
+if [[ $mainmenu_option == "Subtitles" ]]; then
+	run_subtitle
+elif [[ $mainmenu_option == "Audio" ]]; then
+	run_audio
+elif [[ $mainmenu_option == "Attachements" ]]; then
+	run_attachments
+else
+	exit 0
+fi
