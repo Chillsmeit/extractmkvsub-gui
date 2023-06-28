@@ -5,7 +5,7 @@ It uses zenity and mkvextract <br>
 
 ## Dependencies:
 ```
-sudo apt-get update && sudo apt-get install zenity mkvtoolnix mkvtoolnix-gui
+sudo apt-get update && sudo apt-get install zenity mkvtoolnix mkvtoolnix-gui jq
 ```
 
 ## Instructions:
