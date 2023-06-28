@@ -1,7 +1,7 @@
 # Description
 
 This bash script allows you to extract subtiles from MKV media files in Linux.<br>
-It uses zenity and mkvextract <br>
+It uses zenity for a GUI, mkvextract for file extraction and jq to read the tracks info in JSON<br>
 
 ## Dependencies:
 ```
