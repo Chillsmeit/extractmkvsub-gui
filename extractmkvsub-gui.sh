@@ -293,13 +293,13 @@ function run_attachments() {
 
 
 # Show main menu
-mainmenu_output=$(zenity --forms --title "ExtractMKV" --text "" --add-combo "Extract:" --combo-values "Video|Audio|Subtitles|Attachements|Chapters|All")
+mainmenu_output=$(zenity --forms --title "ExtractMKV" --text "" --add-combo "Extract:" --combo-values "Video|Audio|Subtitles|Attachments|Chapters|All")
 mainmenu_option=$(echo "$mainmenu_output" | awk -F'|' '{print $1}')
 if [[ $mainmenu_option == "Subtitles" ]]; then
 	run_subtitle
 elif [[ $mainmenu_option == "Audio" ]]; then
 	run_audio
-elif [[ $mainmenu_option == "Attachements" ]]; then
+elif [[ $mainmenu_option == "Attachments" ]]; then
 	run_attachments
 else
 	exit 0
