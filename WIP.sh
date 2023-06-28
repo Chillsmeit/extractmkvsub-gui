@@ -50,7 +50,7 @@ function run_audio() {
 	for ((i=0; i<${#id_array[@]}; i++)); do
 		options+=("False" "${id_array[i]}" "${language_array[i]}" "${codec_array[i]}" "${trackname_array[i]}")
 	done
-
+ 
 	# Show the selected array values with Zenity list dialog
 	chosen_audio_ids=$(zenity --list --checklist --title="Choose an audio track" --column="Option" --column="ID" --column="Language" --column="Codec" --column="Track Name" --height=400 --width=700 "${options[@]}" --separator=",")
 echo $chosen_audio_ids
